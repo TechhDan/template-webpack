@@ -1,0 +1,44 @@
+{
+    "Map/SizeTest": {
+        "height": 4300,
+        "width": 2
+    },
+    "activeFile": "map.tmx",
+    "expandedProjectPaths": [
+    ],
+    "fileStates": {
+        "bomber-man-sprite.tsx": {
+            "scaleInDock": 4,
+            "scaleInEditor": 4
+        },
+        "map.tmx": {
+            "scale": 4.2453125,
+            "selectedLayer": 1,
+            "viewCenter": {
+                "x": 260.05152741994846,
+                "y": 164.76996687523007
+            }
+        }
+    },
+    "last.exportedFilePath": "C:/wamp64/www/games/bomber-man/src/assets",
+    "last.imagePath": "C:/wamp64/www/games/bomber-man/assets/images",
+    "lastUsedTilesetExportFilter": "JSON tileset files (*.tsj *.json)",
+    "map.lastUsedExportFilter": "JSON map files (*.tmj *.json)",
+    "map.lastUsedFormat": "tmx",
+    "map.tileHeight": 16,
+    "map.tileWidth": 16,
+    "openFiles": [
+        "bomber-man-sprite.tsx",
+        "map.tmx"
+    ],
+    "project": "map.tiled-project",
+    "recentFiles": [
+        "bomber-man-sprite.tsx",
+        "map.tmx"
+    ],
+    "tileset.lastUsedFormat": "tsx",
+    "tileset.tileSize": {
+        "height": 16,
+        "width": 16
+    }
+}
