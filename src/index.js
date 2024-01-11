@@ -1,7 +1,13 @@
 import Phaser from 'phaser';
-import spriteImg from './assets/sprite.png'; // 16 x 16
-import characterImg from './assets/character.png'; // 12 x 12
+import spriteImg from './assets/sprite-export.png';
+import characterImg from './assets/skeleton.png';
+//import duckImg from './assets/duck.png';
 import mapJson from './assets/map.json';
+import testMapJson from './assets/testMap32.json';
+
+const playerSize = 32;
+const tileSize = 32;
+const playerOffset = playerSize/2;
 
 class GraphNode {
     constructor(x, y) {
@@ -22,20 +28,25 @@ class GameMapGraph {
     }
 
     buildGraph(tilemap) {
+        // First we are going to build all the nodes in our graph
         for (let y = 0; y < tilemap.height; y++) {
             for (let x = 0; x < tilemap.width; x++) {
                 const tile = tilemap.getTileAt(x, y, true, 'foreground');
                 if (tile && !tile.collides) {
                     const node = new GraphNode(x, y);
                     this.nodes.set(this.getNodeId(x, y), node);
-
-                    // Add neighbors (up, down, left, and right)
-                    this.addNeighbors(node, tilemap);
                 } else {
                     //console.log('collides', x, y)
                 }
             }
         }
+
+        this.nodes.forEach((node, key) => {
+            const tile = tilemap.getTileAt(node.x, node.y, true, 'foreground');
+            if (tile && !tile.collides) {
+                this.addNeighbors(node, tilemap);
+            }
+        });
     }
 
     addNeighbors(node, tilemap) {
@@ -44,10 +55,10 @@ class GameMapGraph {
             { x: 1, y: 0 },  // right
             { x: 0, y: -1 }, // up
             { x: 0, y: 1 },  // down,
-            { x: -1, y: -1 }, // up-left
-            { x: 1, y: -1 },  // up-right
-            { x: -1, y: 1 }, // down-left
-            { x: 1, y: 1 }   // down-right
+            // { x: -1, y: -1 }, // up-left
+            // { x: 1, y: -1 },  // up-right
+            // { x: -1, y: 1 }, // down-left
+            // { x: 1, y: 1 }   // down-right
         ];
 
         directions.forEach(dir => {
@@ -88,54 +99,67 @@ class GameMapGraph {
 class MyGame extends Phaser.Scene {
     constructor() {
         super();
+        this.playerSpeed = 100;
     }
 
     preload() {
         this.load.image('sprite', spriteImg);
-        this.load.spritesheet('character', characterImg, { frameWidth: 12, frameHeight: 12 });
+        this.load.spritesheet('character', characterImg, { frameWidth: 32, frameHeight: 32 });
         this.load.tilemapTiledJSON('map', mapJson);
-
-        this.targetZoom = 3; // Target zoom level, greater than 1 for zoom-in
-        this.zoomSpeed = 0.001; // Initial speed of zoom
-        this.zoomIncrease = 1.001;
+        this.load.tilemapTiledJSON('testMap', testMapJson);
     }
 
     create() {
-        const map = this.make.tilemap({ key: 'map' });
-
-        map.setCollisionByProperty({ collides: true });
-        const tiles = map.addTilesetImage('bomber-man-sprite', 'sprite');
+        const map = this.make.tilemap({ key: 'testMap' });
+        const tiles = map.addTilesetImage('sprite-export', 'sprite');
         const layer = map.createLayer('foreground', tiles, 0, 0);
-        const hatsLayer = map.createLayer('hats', tiles, 0, 0);
         layer.setCollision([3]);
 
-        const centerXInPixels = map.widthInPixels / 2;
-        const centerYInPixels = map.heightInPixels / 2;
-
         this.character = this.physics.add.sprite(
-            centerXInPixels,
-            centerYInPixels,
+            0 * playerSize + playerOffset,
+            0 * playerSize + playerOffset,
             'character'
         );
-        //this.initCharacterAnimations();
-
-        //this.physics.add.collider(this.character, layer);
+        this.initDuckAnimations();
 
         this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
         this.cameras.main.setZoom(1);
         this.cameras.main.startFollow(this.character, true, 0.1, 0.1);
 
-        // Assuming the character starts at the center of the map
+        // Where the player starts
         const mapGraph = new GameMapGraph(map);
         this.dfsPath = [];
         let startNode = mapGraph.nodes.get(mapGraph.getNodeId(
-            Math.floor(map.width / 2),
-            Math.floor(map.height / 2)
+            0,
+            0
         ));
         mapGraph.dfs(startNode, node => this.dfsPath.push(node));
         this.currentPathIndex = 0; // Initialize the path index
         this.nextNode = this.dfsPath[this.currentPathIndex]; // Next node to move to
+
+        this.physics.add.collider(this.character, layer, (player, tile) => {
+            // Set velocity to 0
+            player.setVelocityX(0);
+            player.setVelocityY(0);
+        
+            // Log collision info
+            
+            // Create a red rectangle overlay
+            const graphics = this.add.graphics();
+            graphics.fillStyle(0xff0000, 1); // Red color
+            graphics.fillRect(tile.x * tileSize, tile.y * tileSize, tileSize, tileSize);
+
+            // get current nodes x
+            console.log(this.dfsPath, this.currentPathIndex);
+            
+            // pause the game
+            player.x = this.dfsPath[this.currentPathIndex].x * tileSize + playerOffset;
+            player.y = this.dfsPath[this.currentPathIndex].y * tileSize + playerOffset;
+            console.log(this.currentPathIndex);
+            //this.physics.pause();
+        });
     }
+    
 
     moveToNextNode() {
         // Current position
@@ -143,12 +167,14 @@ class MyGame extends Phaser.Scene {
         let charY = this.character.y;
 
         // Destination position
-        let destX = this.nextNode.x * 12; // assuming you have tileWidth defined
-        let destY = this.nextNode.y * 12; // assuming you have tileHeight 
+        let destX = (this.nextNode.x * tileSize) + playerOffset; // assuming you have tileWidth defined
+        let destY = (this.nextNode.y * tileSize) + playerOffset; // assuming you have tileHeight
 
+        // Epilipson with playerSpeed 
+        const fuzzyXEpilipson = this.playerSpeed * 0.009;
 
         // Check if character has reached the next node
-        if (Phaser.Math.Fuzzy.Equal(charX, destX, 1.7) && Phaser.Math.Fuzzy.Equal(charY, destY, 1.7)) {
+        if (Phaser.Math.Fuzzy.Equal(charX, destX, fuzzyXEpilipson) && Phaser.Math.Fuzzy.Equal(charY, destY, fuzzyXEpilipson)) {
             this.currentPathIndex++; // Move to the next node in the path
             if (this.currentPathIndex < this.dfsPath.length) {
                 this.nextNode = this.dfsPath[this.currentPathIndex];
@@ -157,9 +183,11 @@ class MyGame extends Phaser.Scene {
         }
 
         // Calculate direction and set velocity
+
         let angle = Phaser.Math.Angle.Between(charX, charY, destX, destY);
-        this.character.setVelocityX(Math.cos(angle) * 200); // adjust speed as necessary
-        this.character.setVelocityY(Math.sin(angle) * 200);
+
+        this.character.setVelocityX(Math.cos(angle) * this.playerSpeed); // adjust speed as necessary
+        this.character.setVelocityY(Math.sin(angle) * this.playerSpeed);
 
         // Update animation based on direction
         //this.updateCharacterAnimation(angle);
@@ -168,24 +196,31 @@ class MyGame extends Phaser.Scene {
     update() {
         if (this.currentPathIndex < this.dfsPath.length) {
             this.moveToNextNode();
-        } else {
-            //console.log('END', this.currentPathIndex, this.dfsPath.length)
-        }
 
-        if (this.cameras.main.zoom < this.targetZoom) {
-            // Increase the zoom speed over time (if desired)
-            this.zoomSpeed *= this.zoomIncrease;
-
-            // Adjust the camera's zoom level
-            this.cameras.main.zoom += this.zoomSpeed;
-
-            // Ensure it doesn't go above the target zoom
-            if (this.cameras.main.zoom > this.targetZoom) {
-                this.cameras.main.zoom = this.targetZoom;
+            // Flip if moving left
+            if (this.character.body.velocity.x < 0) {
+                this.character.flipX = true;
+            } else {
+                this.character.flipX = false;
             }
-        }
 
-        console.log(this.character.x, this.character.y);
+            // Change animation based on velocity. Check both x and y velocity
+            if (this.character.body.velocity.x > 90) {
+                this.character.play('walk-right', true);
+            } else if (this.character.body.velocity.x < -90) {
+                this.character.play('walk-right', true);
+            } else if (this.character.body.velocity.y > 90) {
+                this.character.play('walk-down', true);
+            } else if (this.character.body.velocity.y < -90) {
+                this.character.play('walk-up', true);
+                console.log('walk up');
+            }
+            console.log('velocity', this.character.body.velocity.x, this.character.body.velocity.y);
+        } else {
+            this.character.setVelocityX(0);
+            this.character.setVelocityY(0);
+            console.log('END', this.currentPathIndex, this.dfsPath.length)
+        }
     }
 
     initCharacterAnimations() {
@@ -239,6 +274,53 @@ class MyGame extends Phaser.Scene {
 
         this.character.play('walk-right', true);
     }
+
+    initDuckAnimations() {
+        this.anims.create({
+            key: 'walk-down',
+            frames: [
+                // 0 - 4 
+                { key: 'character', frame: 12 },
+                { key: 'character', frame: 13 },
+                { key: 'character', frame: 14 },
+                { key: 'character', frame: 15 },
+                
+            ],
+            frameRate: 10,
+            repeat: -1
+        });
+
+        this.anims.create({
+            key: 'walk-up',
+            frames: [
+                // 0 - 4 
+                { key: 'character', frame: 20 },
+                { key: 'character', frame: 21 },
+                { key: 'character', frame: 22 },
+                { key: 'character', frame: 23 },
+                
+            ],
+            frameRate: 10,
+            repeat: -1
+        });
+
+        this.anims.create({
+            key: 'walk-right',
+            frames: [
+                // 0 - 4 
+                { key: 'character', frame: 16 },
+                { key: 'character', frame: 17 },
+                { key: 'character', frame: 18 },
+                { key: 'character', frame: 19 },
+                
+            ],
+            frameRate: 10,
+            repeat: -1
+        });
+
+        this.character.play('walk-up', true);
+    
+    }
 }
 
 const config = {
@@ -248,14 +330,14 @@ const config = {
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
-        width: 800,
-        height: 600
+        width: 320,
+        height: 480
     },
     physics: {
         default: 'arcade',
         arcade: {
             gravity: { y: 0 },
-            debug: true,
+            debug: false,
         }
     },
     scene: MyGame
